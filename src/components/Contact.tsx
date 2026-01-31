@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { Container } from "./Container";
 
 type FieldProps = {
@@ -8,7 +8,14 @@ type FieldProps = {
   type?: string;
   placeholder?: string;
   autoComplete?: string;
+  required?: boolean;
+  value: string;
+  error?: string;
+  onChange: (v: string) => void;
+  onBlur: () => void;
 };
+
+const easeLuxury: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
 function Field({
   label,
@@ -16,6 +23,11 @@ function Field({
   type = "text",
   placeholder,
   autoComplete,
+  required,
+  value,
+  error,
+  onChange,
+  onBlur,
 }: FieldProps) {
   return (
     <motion.label
@@ -25,49 +37,134 @@ function Field({
         show: { opacity: 1, y: 0 },
       }}
     >
-      <span className="text-sm text-black/70">{label}</span>
+      <span className="text-sm text-black/70">
+        {label}
+        {required && <span className="ml-1 text-red-500">*</span>}
+      </span>
 
       {/* shimmer wrapper */}
-      <span className="shimmer-focus block rounded-xl">
+      <span
+        className={`shimmer-focus block rounded-xl ${error ? "is-error" : ""}`}
+      >
         <input
           name={name}
           type={type}
           placeholder={placeholder}
           autoComplete={autoComplete}
-          className="
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onBlur={onBlur}
+          required={required}
+          aria-invalid={!!error}
+          aria-describedby={error ? `${name}-error` : undefined}
+          className={`
             h-12 w-full rounded-xl
             bg-white/70
-            border border-black/10
+            border
             px-4 text-[15px] text-[rgb(var(--ink))]
             shadow-[0_8px_20px_rgba(0,0,0,0.06)]
             outline-none
             transition
-            focus:border-[rgb(var(--gold))]/55
-            focus:ring-2 focus:ring-[rgb(var(--gold))]/20
             focus:-translate-y-[1px]
-          "
+            ${
+              error
+                ? "border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-300/35"
+                : "border-black/10 focus:border-[rgb(var(--gold))]/55 focus:ring-2 focus:ring-[rgb(var(--gold))]/20"
+            }
+          `}
         />
       </span>
+
+      {error && (
+        <motion.span
+          id={`${name}-error`}
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-xs text-red-600"
+        >
+          {error}
+        </motion.span>
+      )}
     </motion.label>
   );
 }
 
 type SubmitState = "idle" | "loading" | "success";
 
+type FormState = {
+  name: string;
+  email: string;
+  checkin: string;
+  checkout: string;
+  guests: string;
+  room: string;
+  message: string;
+};
+
 export function Contact() {
+  const reduce = useReducedMotion();
   const [status, setStatus] = useState<SubmitState>("idle");
 
-  const easing = useMemo<[number, number, number, number]>(
-    () => [0.16, 1, 0.3, 1],
-    [],
-  );
+  const [form, setForm] = useState<FormState>({
+    name: "",
+    email: "",
+    checkin: "",
+    checkout: "",
+    guests: "",
+    room: "",
+    message: "",
+  });
+
+  const [touched, setTouched] = useState<Record<keyof FormState, boolean>>({
+    name: false,
+    email: false,
+    checkin: false,
+    checkout: false,
+    guests: false,
+    room: false,
+    message: false,
+  });
+
+  const easing = useMemo(() => easeLuxury, []);
+
+  // --- Validation helpers ---
+  const emailOk = (v: string) => /^\S+@\S+\.\S+$/.test(v.trim());
+
+  const errors: Partial<Record<keyof FormState, string>> = useMemo(() => {
+    const e: Partial<Record<keyof FormState, string>> = {};
+
+    if (!form.name.trim()) e.name = "Please enter your full name.";
+    if (!form.email.trim()) e.email = "Please enter your email.";
+    else if (!emailOk(form.email)) e.email = "Please enter a valid email.";
+
+    if (!form.checkin) e.checkin = "Select your check-in date.";
+    if (!form.checkout) e.checkout = "Select your check-out date.";
+
+    // Date relationship check (premium detail)
+    if (form.checkin && form.checkout) {
+      const inDate = new Date(form.checkin).getTime();
+      const outDate = new Date(form.checkout).getTime();
+      if (outDate <= inDate) e.checkout = "Check-out must be after check-in.";
+    }
+
+    if (!String(form.guests).trim()) e.guests = "Enter number of guests.";
+    else {
+      const n = Number(form.guests);
+      if (!Number.isFinite(n) || n <= 0)
+        e.guests = "Guests must be at least 1.";
+    }
+
+    return e;
+  }, [form]);
+
+  const isValid = Object.keys(errors).length === 0;
 
   const sectionVariants = {
     hidden: { opacity: 0, y: 18 },
     show: {
       opacity: 1,
       y: 0,
-      transition: { duration: 0.9, ease: easing },
+      transition: reduce ? { duration: 0 } : { duration: 0.9, ease: easing },
     },
   };
 
@@ -77,22 +174,40 @@ export function Contact() {
       opacity: 1,
       y: 0,
       scale: 1,
-      transition: { duration: 1.0, ease: easing },
+      transition: reduce ? { duration: 0 } : { duration: 1.0, ease: easing },
     },
   };
 
   const staggerWrap = {
     hidden: {},
     show: {
-      transition: {
-        staggerChildren: 0.07,
-        delayChildren: 0.08,
-      },
+      transition: reduce
+        ? {}
+        : {
+            staggerChildren: 0.07,
+            delayChildren: 0.08,
+          },
     },
+  };
+
+  const markAllTouched = () => {
+    setTouched((prev) => {
+      const next = { ...prev };
+      (Object.keys(next) as Array<keyof FormState>).forEach(
+        (k) => (next[k] = true),
+      );
+      return next;
+    });
   };
 
   const onSubmit = () => {
     if (status !== "idle") return;
+
+    // If invalid → show errors + stop
+    if (!isValid) {
+      markAllTouched();
+      return;
+    }
 
     setStatus("loading");
 
@@ -104,7 +219,11 @@ export function Contact() {
   };
 
   return (
-    <div className="relative overflow-hidden">
+    <section
+      id="contact"
+      className="relative overflow-hidden scroll-mt-24"
+      aria-label="Contact"
+    >
       {/* soft background wash */}
       <div
         className="pointer-events-none absolute inset-0 opacity-[0.35]"
@@ -201,6 +320,7 @@ export function Contact() {
                 e.preventDefault();
                 onSubmit();
               }}
+              noValidate
             >
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field
@@ -208,38 +328,72 @@ export function Contact() {
                   name="name"
                   placeholder="Your name"
                   autoComplete="name"
+                  required
+                  value={form.name}
+                  onChange={(v) => setForm((p) => ({ ...p, name: v }))}
+                  onBlur={() => setTouched((p) => ({ ...p, name: true }))}
+                  error={touched.name ? errors.name : undefined}
                 />
+
                 <Field
                   label="Email"
                   name="email"
                   type="email"
                   placeholder="you@email.com"
                   autoComplete="email"
+                  required
+                  value={form.email}
+                  onChange={(v) => setForm((p) => ({ ...p, email: v }))}
+                  onBlur={() => setTouched((p) => ({ ...p, email: true }))}
+                  error={touched.email ? errors.email : undefined}
                 />
+
                 <Field
                   label="Check-in"
                   name="checkin"
                   type="date"
                   autoComplete="off"
+                  required
+                  value={form.checkin}
+                  onChange={(v) => setForm((p) => ({ ...p, checkin: v }))}
+                  onBlur={() => setTouched((p) => ({ ...p, checkin: true }))}
+                  error={touched.checkin ? errors.checkin : undefined}
                 />
+
                 <Field
                   label="Check-out"
                   name="checkout"
                   type="date"
                   autoComplete="off"
+                  required
+                  value={form.checkout}
+                  onChange={(v) => setForm((p) => ({ ...p, checkout: v }))}
+                  onBlur={() => setTouched((p) => ({ ...p, checkout: true }))}
+                  error={touched.checkout ? errors.checkout : undefined}
                 />
+
                 <Field
                   label="Guests"
                   name="guests"
                   type="number"
                   placeholder="2"
                   autoComplete="off"
+                  required
+                  value={form.guests}
+                  onChange={(v) => setForm((p) => ({ ...p, guests: v }))}
+                  onBlur={() => setTouched((p) => ({ ...p, guests: true }))}
+                  error={touched.guests ? errors.guests : undefined}
                 />
+
                 <Field
                   label="Room Preference"
                   name="room"
                   placeholder="Suite, Ocean View..."
                   autoComplete="off"
+                  value={form.room}
+                  onChange={(v) => setForm((p) => ({ ...p, room: v }))}
+                  onBlur={() => setTouched((p) => ({ ...p, room: true }))}
+                  error={undefined}
                 />
               </div>
 
@@ -258,6 +412,10 @@ export function Contact() {
                     name="message"
                     rows={4}
                     placeholder="Anything we should prepare for your stay?"
+                    value={form.message}
+                    onChange={(e) =>
+                      setForm((p) => ({ ...p, message: e.target.value }))
+                    }
                     className="
                       w-full rounded-xl
                       bg-white/70
@@ -288,39 +446,47 @@ export function Contact() {
 
                 <motion.button
                   type="submit"
-                  disabled={status === "loading"}
+                  disabled={!isValid || status === "loading"}
                   whileHover={
-                    status === "idle"
-                      ? {
-                          y: -1,
-                          boxShadow: "0 18px 45px rgba(0,0,0,0.18)",
-                        }
+                    !reduce && status === "idle" && isValid
+                      ? { y: -1, boxShadow: "0 18px 45px rgba(0,0,0,0.18)" }
                       : undefined
                   }
-                  whileTap={status === "idle" ? { scale: 0.985 } : undefined}
+                  whileTap={
+                    !reduce && status === "idle" && isValid
+                      ? { scale: 0.985 }
+                      : undefined
+                  }
                   animate={
-                    status === "success"
+                    !reduce && status === "success"
                       ? {
-                          boxShadow: "0 0 0 rgba(0,0,0,0.0)",
+                          scale: [1, 1.01, 1],
+                          boxShadow: [
+                            "0 16px 40px rgba(0,0,0,0.16)",
+                            "0 22px 70px rgba(197,168,108,0.35)",
+                            "0 16px 40px rgba(0,0,0,0.16)",
+                          ],
                         }
                       : undefined
                   }
                   transition={{ duration: 0.45, ease: easing }}
-                  className="
+                  className={`
                     inline-flex items-center justify-center gap-2
                     rounded-full
-                    bg-[rgb(var(--gold))]
                     px-8 py-3
                     text-sm font-semibold
-                    text-[#0b1220]
                     shadow-[0_16px_40px_rgba(0,0,0,0.16)]
-                    hover:opacity-95
                     transition
-                    disabled:opacity-70
                     focus-visible:outline-none
                     focus-visible:ring-2 focus-visible:ring-[rgb(var(--gold))]/60
                     focus-visible:ring-offset-2 focus-visible:ring-offset-[rgb(var(--bg))]
-                  "
+                    ${
+                      !isValid
+                        ? "bg-black/15 text-black/40 cursor-not-allowed"
+                        : "bg-[rgb(var(--gold))] text-[#0b1220] hover:opacity-95"
+                    }
+                    ${status === "loading" ? "opacity-80" : ""}
+                  `}
                 >
                   {status === "loading" && (
                     <span
@@ -353,6 +519,46 @@ export function Contact() {
           </motion.div>
         </div>
       </Container>
-    </div>
+
+      {/* Focus shimmer CSS (local) */}
+      <style>{`
+        .shimmer-focus { position: relative; }
+        .shimmer-focus::before {
+          content: "";
+          position: absolute;
+          inset: -1px;
+          border-radius: 12px;
+          opacity: 0;
+          pointer-events: none;
+          background:
+            linear-gradient(90deg,
+              rgba(197,168,108,0) 0%,
+              rgba(197,168,108,0.35) 25%,
+              rgba(197,168,108,0.0) 50%,
+              rgba(197,168,108,0.35) 75%,
+              rgba(197,168,108,0) 100%);
+          filter: blur(6px);
+          transform: translateX(-30%);
+          transition: opacity .25s ease;
+        }
+        .shimmer-focus:focus-within::before {
+          opacity: 1;
+          animation: shimmerMove 1.15s ${reduce ? "linear" : "cubic-bezier(.16,1,.3,1)"} infinite;
+        }
+        /* Error: subtle red glow instead of gold shimmer */
+        .shimmer-focus.is-error::before {
+          background: linear-gradient(90deg,
+              rgba(239,68,68,0) 0%,
+              rgba(239,68,68,0.25) 25%,
+              rgba(239,68,68,0.0) 50%,
+              rgba(239,68,68,0.25) 75%,
+              rgba(239,68,68,0) 100%);
+        }
+        @keyframes shimmerMove {
+          from { transform: translateX(-35%); }
+          to { transform: translateX(35%); }
+        }
+      `}</style>
+    </section>
   );
 }
