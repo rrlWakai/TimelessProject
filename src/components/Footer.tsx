@@ -32,6 +32,7 @@ export function Footer() {
           {/* Bottom row */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs text-black/45">
             <div>© {new Date().getFullYear()} Timeless Hotel</div>
+            <div>Developer Rhen-Rhen A. Lumbo</div>
             <div className="flex gap-4">
               <a href="#" className="hover:text-black transition">
                 Privacy
