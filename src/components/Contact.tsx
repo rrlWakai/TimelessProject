@@ -17,7 +17,7 @@ const fadeUp = {
 const stagger = {
   hidden: {},
   show: {
-    opacity: 1, // Add a dummy animatable property
+    opacity: 1, // dummy animatable property so TS is happy
   },
 };
 
@@ -43,6 +43,12 @@ function Field({
 }
 
 export function Contact() {
+  const showAlert = (message: string) => {
+    if (typeof window !== "undefined") {
+      window.alert(message);
+    }
+  };
+
   return (
     <section className="relative overflow-hidden" id="contact">
       {/* background wash */}
@@ -132,14 +138,19 @@ export function Contact() {
                 delayChildren: 0.1,
               }}
               className="
-                rounded-[var(--radius-card)]
+                rounded-(--radius-card)
                 bg-white/70
                 border border-black/10
-                shadow-[var(--shadow-card)]
+                shadow-(--shadow-card)
                 backdrop-blur
                 p-5 sm:p-7
               "
-              onSubmit={(e) => e.preventDefault()}
+              onSubmit={(e) => {
+                e.preventDefault();
+                showAlert(
+                  "Reservation request sent! Our team will contact you shortly.",
+                );
+              }}
             >
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field
@@ -210,7 +221,7 @@ export function Contact() {
                   transition={{ duration: 0.3 }}
                   className="contact-submit"
                 >
-                  Request Reservation
+                  Reserve Now
                 </motion.button>
               </motion.div>
             </motion.form>
