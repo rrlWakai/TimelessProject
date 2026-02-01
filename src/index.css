@@ -1,4 +1,11 @@
+@font-face {
+  font-family: Cinzel;
+  src: url("./assets/fonts/Cinzel-Regular.woff2") 
+}
 @import "tailwindcss";
+@theme {
+  --font-cinzel: Cinzel, "sans-serif";
+}
 
 :root {
   /* Core colors */
