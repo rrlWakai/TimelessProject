@@ -38,6 +38,14 @@ const ROOMS: Room[] = [
     price: 550,
     meta: "King Bed · 3 Guests · Garden View",
   },
+  {
+    id: "4",
+    type: "Luxury Suite",
+    name: "Hillside Retreat Suite",
+    image: "/images/room4.jpg",
+    price: 600,
+    meta: "Queen Bed · 2 Guests · Hillside View",
+  },
 ];
 
 function clamp(n: number, min: number, max: number) {
