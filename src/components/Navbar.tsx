@@ -68,7 +68,7 @@ export function Navbar() {
               ${scrolled ? "h-7 sm:h-8 opacity-95" : "h-9 sm:h-10 opacity-100"}
             `}
           />
-          <span className="font-semibold tracking-wide text-[rgb(var(--gold))]">
+          <span className="font-cinzel tracking-wide text-[rgb(var(--gold))]">
             Timeless Resort
           </span>
         </a>
