@@ -16,6 +16,13 @@ export default function AdminLayout() {
           <Link className="rounded-lg px-3 py-2 hover:bg-white/10" to="/admin">
             Dashboard
           </Link>
+
+          <Link
+            className="rounded-lg px-3 py-2 hover:bg-white/10"
+            to="/admin/reservations"
+          >
+            Reservations
+          </Link>
         </nav>
       </aside>
 
