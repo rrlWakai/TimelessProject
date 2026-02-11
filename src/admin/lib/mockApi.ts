@@ -18,6 +18,7 @@ const seed: Reservation[] = [
     id: "R-1002",
     fullName: "Paul Benson",
     email: "paul@example.com",
+    phone: "+63 917 222 3344",
     checkIn: "2026-03-10",
     checkOut: "2026-03-12",
     guests: 4,
@@ -29,6 +30,7 @@ const seed: Reservation[] = [
     id: "R-1003",
     fullName: "Sophie Martin",
     email: "sophie@example.com",
+    phone: "+63 905 888 9900",
     checkIn: "2026-02-20",
     checkOut: "2026-02-22",
     guests: 3,
@@ -59,7 +61,7 @@ function save(data: Reservation[]) {
 }
 
 export async function listReservations(): Promise<Reservation[]> {
-  await new Promise((r) => setTimeout(r, 150)); // simulate network
+  await new Promise((r) => setTimeout(r, 150));
   return load().sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 }
 
@@ -75,4 +77,43 @@ export async function updateReservationStatus(
   data[idx] = { ...data[idx], status };
   save(data);
   return data[idx];
+}
+
+function makeId() {
+  return `R-${Date.now()}`;
+}
+
+export async function createReservation(input: {
+  fullName: string;
+  email: string;
+  phone?: string;
+  checkIn: string;
+  checkOut: string;
+  guests: number;
+  roomPreference?: string;
+  message?: string;
+}): Promise<Reservation> {
+  await new Promise((r) => setTimeout(r, 150));
+
+  const data = load();
+  const now = new Date().toISOString();
+
+  const reservation: Reservation = {
+    id: makeId(),
+    fullName: input.fullName.trim(),
+    email: input.email.trim(),
+    phone: input.phone?.trim() || undefined,
+    checkIn: input.checkIn,
+    checkOut: input.checkOut,
+    guests: input.guests,
+    roomPreference: input.roomPreference?.trim() || undefined,
+    message: input.message?.trim() || undefined,
+    status: "new" as ReservationStatus,
+    createdAt: now,
+  };
+
+  data.unshift(reservation);
+  save(data);
+
+  return reservation;
 }
