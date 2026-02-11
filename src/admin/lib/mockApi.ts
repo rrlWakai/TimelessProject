@@ -1,63 +1,66 @@
 import type { Reservation, ReservationStatus } from "./type";
 
 const seed: Reservation[] = [
-  {
-    id: "R-1001",
-    fullName: "Sarah Swift",
-    email: "sarah@example.com",
-    phone: "+63 912 345 6789",
-    checkIn: "2026-03-02",
-    checkOut: "2026-03-04",
-    guests: 2,
-    roomPreference: "Presidential Suite",
-    message: "Anniversary stay — quiet room please.",
-    status: "new",
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "R-1002",
-    fullName: "Paul Benson",
-    email: "paul@example.com",
-    phone: "+63 917 222 3344",
-    checkIn: "2026-03-10",
-    checkOut: "2026-03-12",
-    guests: 4,
-    roomPreference: "Garden Villa Suite",
-    status: "pending",
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(),
-  },
-  {
-    id: "R-1003",
-    fullName: "Sophie Martin",
-    email: "sophie@example.com",
-    phone: "+63 905 888 9900",
-    checkIn: "2026-02-20",
-    checkOut: "2026-02-22",
-    guests: 3,
-    roomPreference: "Deluxe Ocean Suite",
-    status: "confirmed",
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-  },
+ 
 ];
 
 const LS_KEY = "timeless_reservations_v1";
+const LS_SEQ_KEY = "timeless_reservations_seq_v1";
 
 function load(): Reservation[] {
   const raw = localStorage.getItem(LS_KEY);
   if (!raw) {
     localStorage.setItem(LS_KEY, JSON.stringify(seed));
+    // initialize sequence from seed
+    const max = getMaxNumericId(seed);
+    localStorage.setItem(LS_SEQ_KEY, String(Math.max(100, max)));
     return seed;
   }
   try {
-    return JSON.parse(raw) as Reservation[];
+    const parsed = JSON.parse(raw) as Reservation[];
+    // ensure seq exists
+    if (!localStorage.getItem(LS_SEQ_KEY)) {
+      const max = getMaxNumericId(parsed);
+      localStorage.setItem(LS_SEQ_KEY, String(Math.max(100, max)));
+    }
+    return parsed;
   } catch {
     localStorage.setItem(LS_KEY, JSON.stringify(seed));
+    const max = getMaxNumericId(seed);
+    localStorage.setItem(LS_SEQ_KEY, String(Math.max(100, max)));
     return seed;
   }
 }
 
 function save(data: Reservation[]) {
   localStorage.setItem(LS_KEY, JSON.stringify(data));
+}
+
+function getMaxNumericId(list: Reservation[]) {
+  let max = 0;
+  for (const r of list) {
+    const n = parseNumericId(r.id);
+    if (n && n > max) max = n;
+  }
+  return max;
+}
+
+function parseNumericId(id: string): number | null {
+  // supports "R-100" or "R-0100" etc.
+  const m = /^R-(\d+)$/.exec(id.trim());
+  if (!m) return null;
+  const n = Number(m[1]);
+  return Number.isFinite(n) ? n : null;
+}
+
+function nextId(): string {
+  // Always increment from stored sequence
+  const raw = localStorage.getItem(LS_SEQ_KEY);
+  const current = raw ? Number(raw) : Math.max(100, getMaxNumericId(load()));
+  const next = Number.isFinite(current) ? current + 1 : 101;
+
+  localStorage.setItem(LS_SEQ_KEY, String(next));
+  return `R-${next}`;
 }
 
 export async function listReservations(): Promise<Reservation[]> {
@@ -67,7 +70,7 @@ export async function listReservations(): Promise<Reservation[]> {
 
 export async function updateReservationStatus(
   id: string,
-  status: ReservationStatus
+  status: ReservationStatus,
 ): Promise<Reservation> {
   await new Promise((r) => setTimeout(r, 150));
   const data = load();
@@ -79,8 +82,15 @@ export async function updateReservationStatus(
   return data[idx];
 }
 
-function makeId() {
-  return `R-${Date.now()}`;
+export async function deleteReservation(id: string): Promise<void> {
+  await new Promise((r) => setTimeout(r, 150));
+
+  const data = load();
+  const next = data.filter((x) => x.id !== id);
+
+  if (next.length === data.length) throw new Error("Reservation not found");
+
+  save(next);
 }
 
 export async function createReservation(input: {
@@ -99,7 +109,7 @@ export async function createReservation(input: {
   const now = new Date().toISOString();
 
   const reservation: Reservation = {
-    id: makeId(),
+    id: nextId(),
     fullName: input.fullName.trim(),
     email: input.email.trim(),
     phone: input.phone?.trim() || undefined,
