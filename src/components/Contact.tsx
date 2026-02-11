@@ -159,16 +159,16 @@ function SuccessModal({
             <div className="mt-6 flex flex-col sm:flex-row gap-3">
               <button
                 onClick={onClose}
-                className="w-full rounded-2xl bg-black px-4 py-3 text-sm font-medium text-white shadow-sm hover:bg-black/90"
+                className="w-full rounded-2xl bg-red-400 px-4 py-3 text-sm font-medium text-white shadow-sm hover:bg-red-800"
               >
-                Close
+                Cancel
               </button>
               <a
                 href="#top"
                 onClick={onClose}
                 className="w-full text-center rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm font-medium text-black/80 shadow-sm hover:bg-black/[0.03]"
               >
-                Back to top
+                Confirmed
               </a>
             </div>
 
@@ -470,7 +470,7 @@ export function Contact() {
                   className="contact-submit"
                   disabled={state.kind === "sending"}
                 >
-                  {state.kind === "sending" ? "Sending..." : "Reserve Now"}
+                  {state.kind === "sending" ? "Sending..." : "Reserve"}
                 </motion.button>
               </motion.div>
 
