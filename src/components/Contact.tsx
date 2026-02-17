@@ -1,7 +1,8 @@
+// src/components/Contact.tsx
 import { Container } from "./Container";
 import { motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
-import { createReservation } from "../admin/lib/mockApi";
+import { onRoomAction } from "../admin/lib/roomActions"; // ✅ shared path
 
 type FieldProps = {
   label: string;
@@ -59,7 +60,6 @@ function isValidEmail(email: string) {
 }
 
 function isValidPhone(phone: string) {
-  // Allows "+", spaces, dashes; requires 7–15 digits total
   const digits = phone.replace(/\D/g, "");
   if (digits.length < 7 || digits.length > 15) return false;
   return /^\+?[0-9\s-]+$/.test(phone);
@@ -70,13 +70,21 @@ function parseDate(value: string) {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-// Simple formatter: keeps optional leading "+" then groups digits as 3-3-4-...
-// (Not country-perfect, but clean and consistent.)
-function formatPhoneInput(raw: string) {
-  const hasPlus = raw.trim().startsWith("+");
-  const digits = raw.replace(/\D/g, "");
+// Extract guests from strings like: "King Bed · 4 Guests · Panoramic View"
+function extractGuestsFromMeta(meta?: string) {
+  if (!meta) return null;
+  const m = meta.match(/(\d+)\s*Guests?/i);
+  if (!m) return null;
+  const n = Number(m[1]);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
 
-  // Build grouped display: 3-3-4-... (rest)
+// Simple formatter: optional "+" then groups digits: 3 3 4 ...
+function formatPhoneInput(raw: string) {
+  const trimmed = raw.trim();
+  const hasPlus = trimmed.startsWith("+");
+  const digits = trimmed.replace(/\D/g, "");
+
   const parts: string[] = [];
   let i = 0;
 
@@ -98,6 +106,33 @@ function formatPhoneInput(raw: string) {
 
   const joined = parts.filter(Boolean).join(" ");
   return hasPlus ? `+${joined}` : joined;
+}
+
+// ✅ Real backend call (replaces mockApi)
+async function createReservationApi(input: {
+  fullName: string;
+  email: string;
+  phone?: string;
+  checkIn: string;
+  checkOut: string;
+  guests: number;
+  roomPreference?: string;
+  message?: string;
+}) {
+  const res = await fetch("http://localhost:4000/api/reservations", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+
+  if (!res.ok) {
+    const data = (await res.json().catch(() => null)) as {
+      message?: string;
+    } | null;
+    throw new Error(data?.message || "Failed to create reservation.");
+  }
+
+  return res.json();
 }
 
 function SuccessModal({
@@ -157,18 +192,12 @@ function SuccessModal({
             </p>
 
             <div className="mt-6 flex flex-col sm:flex-row gap-3">
-              <button
-                onClick={onClose}
-                className="w-full rounded-2xl bg-red-400 px-4 py-3 text-sm font-medium text-white shadow-sm hover:bg-red-800"
-              >
-                Cancel
-              </button>
               <a
                 href="#top"
                 onClick={onClose}
                 className="w-full text-center rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm font-medium text-black/80 shadow-sm hover:bg-black/[0.03]"
               >
-                Confirmed
+                Okay
               </a>
             </div>
 
@@ -190,8 +219,28 @@ export function Contact() {
 
   const [successOpen, setSuccessOpen] = useState(false);
 
-  // Controlled phone value so we can format as they type (UI stays same)
+  // Controlled values
   const [phone, setPhone] = useState("");
+  const [selectedRoom, setSelectedRoom] = useState("");
+
+  // ✅ controlled guests (auto-fill)
+  const [guestsValue, setGuestsValue] = useState("1");
+
+  // Listen for Reserve clicks from rooms
+  useEffect(() => {
+    return onRoomAction((detail) => {
+      if (detail.type === "reserve") {
+        setSelectedRoom(detail.room.name);
+
+        const extracted = extractGuestsFromMeta(detail.room.meta);
+        if (extracted) setGuestsValue(String(extracted));
+
+        document
+          .getElementById("contact")
+          ?.scrollIntoView({ behavior: "smooth" });
+      }
+    });
+  }, []);
 
   const errorText = useMemo(() => {
     return state.kind === "error" ? state.message : null;
@@ -300,11 +349,10 @@ export function Contact() {
                 const email = String(fd.get("email") ?? "").trim();
                 const checkIn = String(fd.get("checkin") ?? "");
                 const checkOut = String(fd.get("checkout") ?? "");
-                const guestsRaw = String(fd.get("guests") ?? "1");
                 const roomPreference = String(fd.get("room") ?? "").trim();
                 const message = String(fd.get("message") ?? "").trim();
 
-                const guests = Math.max(1, Number(guestsRaw || 1));
+                const guestsNum = Math.max(1, Number(guestsValue || "1"));
                 const phoneValue = phone.trim();
 
                 // Validation
@@ -329,6 +377,7 @@ export function Contact() {
                   });
                   return;
                 }
+
                 const inD = parseDate(checkIn);
                 const outD = parseDate(checkOut);
                 if (!inD || !outD) {
@@ -346,7 +395,7 @@ export function Contact() {
                   });
                   return;
                 }
-                if (!Number.isFinite(guests) || guests < 1) {
+                if (!Number.isFinite(guestsNum) || guestsNum < 1) {
                   setState({
                     kind: "error",
                     message: "Guests must be at least 1.",
@@ -357,26 +406,29 @@ export function Contact() {
                 setState({ kind: "sending" });
 
                 try {
-                  await createReservation({
+                  await createReservationApi({
                     fullName,
                     email,
                     phone: phoneValue,
                     checkIn,
                     checkOut,
-                    guests,
+                    guests: guestsNum,
                     roomPreference: roomPreference || undefined,
                     message: message || undefined,
                   });
 
                   form.reset();
                   setPhone("");
+                  setSelectedRoom("");
+                  setGuestsValue("1");
                   setState({ kind: "idle" });
                   setSuccessOpen(true);
-                } catch {
-                  setState({
-                    kind: "error",
-                    message: "Something went wrong. Please try again.",
-                  });
+                } catch (err) {
+                  const msg =
+                    err instanceof Error
+                      ? err.message
+                      : "Something went wrong. Please try again.";
+                  setState({ kind: "error", message: msg });
                 }
               }}
             >
@@ -397,7 +449,6 @@ export function Contact() {
                   required
                 />
 
-                {/* Contact Number (formatted as you type) */}
                 <Field
                   label="Contact Number"
                   name="phone"
@@ -424,6 +475,7 @@ export function Contact() {
                   autoComplete="off"
                   required
                 />
+
                 <Field
                   label="Guests"
                   name="guests"
@@ -432,16 +484,20 @@ export function Contact() {
                   autoComplete="off"
                   min="1"
                   required
+                  value={guestsValue}
+                  onChange={(e) => setGuestsValue(e.target.value)}
                 />
+
                 <Field
                   label="Room Preference"
                   name="room"
                   placeholder="Suite, Ocean View..."
                   autoComplete="off"
+                  value={selectedRoom}
+                  onChange={(e) => setSelectedRoom(e.target.value)}
                 />
               </div>
 
-              {/* message */}
               <motion.label variants={fadeUp} className="grid gap-2 mt-4">
                 <span className="text-sm text-black/70">Message</span>
                 <textarea
@@ -474,7 +530,6 @@ export function Contact() {
                 </motion.button>
               </motion.div>
 
-              {/* Inline error */}
               {errorText && (
                 <motion.div
                   variants={fadeUp}

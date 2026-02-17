@@ -1,60 +1,10 @@
+// src/components/CuratedRooms.tsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Section } from "./Section";
 import { RoomCard } from "./RoomCard";
-
-type Room = {
-  id: string;
-  type: string;
-  name: string;
-  image: string;
-  price: number;
-  badge?: string;
-  meta: string;
-};
-
-const ROOMS: Room[] = [
-  {
-    id: "1",
-    type: "Premium Suite",
-    name: "Deluxe Ocean Suite",
-    image: "/images/room1.jpg",
-    price: 450,
-    meta: "King Bed · 2 Guests · Ocean View",
-  },
-  {
-    id: "2",
-    type: "Executive Suite",
-    name: "Presidential Suite",
-    image: "/images/room2.jpg",
-    price: 850,
-    badge: "MOST POPULAR",
-    meta: "King Bed · 4 Guests · Panoramic View",
-  },
-  {
-    id: "3",
-    type: "Signature Suite",
-    name: "Garden Villa Suite",
-    image: "/images/room3.jpg",
-    price: 550,
-    meta: "King Bed · 3 Guests · Garden View",
-  },
-  {
-    id: "4",
-    type: "Luxury Suite",
-    name: "Hillside Retreat Suite",
-    image: "/images/room4.jpg",
-    price: 600,
-    meta: "Queen Bed · 2 Guests · Hillside View",
-  },
-  {
-    id: "5",
-    type: "Classic Suite",
-    name: "Cityscape Suite",
-    image: "/images/room5.jpg",
-    price: 400,
-    meta: "Queen Bed · 2 Guests · City View",
-  },
-];
+import { ROOMS, type Room } from "../data/rooms";
+import { onRoomAction } from "../admin/lib/roomActions";
+import { RoomDetailsModal } from "./RoomDetailsModal";
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -113,8 +63,24 @@ export function CuratedRooms() {
   const [canRight, setCanRight] = useState(false);
 
   const hasMultiple = useMemo(() => ROOMS.length > 1, []);
-
   const { ref: wrapRef, inView } = useInView<HTMLDivElement>();
+
+  // ✅ Details modal state
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [activeRoom, setActiveRoom] = useState<Room | null>(null);
+
+  // ✅ Listen for RoomCard "details" action
+  useEffect(() => {
+    return onRoomAction((detail) => {
+      if (detail.type !== "details") return;
+
+      const found = ROOMS.find((r) => r.id === detail.room.id) ?? null;
+      if (!found) return;
+
+      setActiveRoom(found);
+      setDetailsOpen(true);
+    });
+  }, []);
 
   const updateControls = () => {
     const el = trackRef.current;
@@ -165,8 +131,6 @@ export function CuratedRooms() {
       id="rooms"
       title="Curated Rooms"
       subtitle="Each suite is thoughtfully designed to balance privacy, comfort, and refined elegance."
-      // NOTE: Section component already renders the heading;
-      // we’ll add a luxury “gold sheen” + animations here around the carousel content.
     >
       <div ref={wrapRef} className="relative">
         {/* Gold sheen accent behind header area (subtle luxury) */}
@@ -199,10 +163,8 @@ export function CuratedRooms() {
               "transition",
               "hover:scale-[1.04] hover:bg-white hover:text-black",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--gold))]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[rgb(var(--bg))]",
-              // gold highlight ring on hover (luxury touch)
               "hover:shadow-[0_18px_46px_rgba(0,0,0,0.16)]",
               !canLeft ? "opacity-40 cursor-not-allowed hover:scale-100" : "",
-              // gentle entrance
               inView ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-2",
               "duration-700 ease-[cubic-bezier(.16,1,.3,1)]",
             ].join(" ")}
@@ -251,7 +213,6 @@ export function CuratedRooms() {
             "overflow-x-auto scroll-smooth snap-x snap-mandatory",
             "pb-2",
             "[-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-            // reveal animation
             "transition-[opacity,transform] duration-700 ease-[cubic-bezier(.16,1,.3,1)]",
             inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3",
           ].join(" ")}
@@ -262,7 +223,6 @@ export function CuratedRooms() {
               className={[
                 "snap-start shrink-0",
                 "w-full sm:w-[calc(50%-12px)] lg:w-[calc(33.333%-21.333px)]",
-                // stagger feel (no JS timers needed)
                 "transition-[transform,opacity] duration-700 ease-[cubic-bezier(.16,1,.3,1)]",
                 inView
                   ? "opacity-100 translate-y-0"
@@ -270,7 +230,6 @@ export function CuratedRooms() {
               ].join(" ")}
               style={{ transitionDelay: `${80 + idx * 90}ms` }}
             >
-              {/* Gold accent border glow wrapper */}
               <div className="group relative">
                 <div
                   aria-hidden="true"
@@ -309,6 +268,13 @@ export function CuratedRooms() {
           aria-hidden="true"
         />
       </div>
+
+      {/* ✅ Details modal */}
+      <RoomDetailsModal
+        open={detailsOpen}
+        room={activeRoom}
+        onClose={() => setDetailsOpen(false)}
+      />
     </Section>
   );
 }

@@ -1,3 +1,6 @@
+// src/components/RoomCard.tsx
+import { emitRoomAction } from "../admin/lib/roomActions";
+
 type Room = {
   id: string;
   name: string;
@@ -16,19 +19,19 @@ export function RoomCard({ room }: Props) {
   return (
     <article
       className="
-  group
-  relative
-  h-full
-  flex
-  flex-col
-  rounded-[var(--radius-card)]
-  bg-white
-  overflow-hidden
-  shadow-[var(--shadow-card)]
-  border border-black/5
-  transition
-  hover:shadow-[0_20px_50px_rgba(0,0,0,0.15)]
-"
+        group
+        relative
+        h-full
+        flex
+        flex-col
+        rounded-[var(--radius-card)]
+        bg-white
+        overflow-hidden
+        shadow-[var(--shadow-card)]
+        border border-black/5
+        transition
+        hover:shadow-[0_20px_50px_rgba(0,0,0,0.15)]
+      "
     >
       {/* Image */}
       <div className="relative h-56 overflow-hidden">
@@ -65,10 +68,18 @@ export function RoomCard({ room }: Props) {
           </div>
 
           <div className="flex gap-2">
-            <button className="rounded-full border border-black/10 px-4 py-2 text-sm hover:bg-black/5 transition">
+            <button
+              type="button"
+              onClick={() => emitRoomAction("details", room)}
+              className="rounded-full border border-black/10 px-4 py-2 text-sm hover:bg-black/5 transition"
+            >
               Details
             </button>
-            <button className="rounded-full bg-[rgb(var(--gold))] px-4 py-2 text-sm text-[#0b1220] font-semibold hover:opacity-90 transition">
+            <button
+              type="button"
+              onClick={() => emitRoomAction("reserve", room)}
+              className="rounded-full bg-[rgb(var(--gold))] px-4 py-2 text-sm text-[#0b1220] font-semibold hover:opacity-90 transition"
+            >
               Reserve
             </button>
           </div>

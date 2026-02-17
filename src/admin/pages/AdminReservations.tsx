@@ -1,14 +1,11 @@
 // src/admin/pages/AdminReservations.tsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Reservation, ReservationStatus } from "../lib/type";
-import {
-  listReservations,
-  updateReservationStatus,
-  deleteReservation,
-} from "../lib/mockApi";
 import StatusBadge from "../components/StatusBadge";
 import AdminPageHeader from "../components/AdminPageHeader";
 import SearchInput from "../components/SearchInput";
+
+const API_BASE = "http://localhost:4000/api";
 
 const filters: Array<{ key: "all" | ReservationStatus; label: string }> = [
   { key: "all", label: "All" },
@@ -23,6 +20,96 @@ function formatDate(d: string) {
   return Number.isNaN(dt.getTime()) ? d : dt.toLocaleDateString();
 }
 
+/* -------------------- REAL API -------------------- */
+async function apiListReservations(): Promise<Reservation[]> {
+  const res = await fetch(`${API_BASE}/reservations`);
+  if (!res.ok) throw new Error("Failed to load reservations.");
+  return res.json();
+}
+
+async function apiUpdateReservationStatus(
+  id: string,
+  status: ReservationStatus,
+): Promise<Reservation> {
+  const res = await fetch(`${API_BASE}/reservations/${id}/status`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status }),
+  });
+
+  if (!res.ok) {
+    const data = (await res.json().catch(() => null)) as {
+      message?: string;
+    } | null;
+    throw new Error(data?.message || "Failed to update status.");
+  }
+
+  return res.json();
+}
+
+async function apiDeleteReservation(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/reservations/${id}`, {
+    method: "DELETE",
+  });
+
+  if (!res.ok && res.status !== 204) {
+    const data = (await res.json().catch(() => null)) as {
+      message?: string;
+    } | null;
+    throw new Error(data?.message || "Failed to delete reservation.");
+  }
+}
+
+/* -------------------- TOAST -------------------- */
+function Toast({
+  open,
+  title,
+  message,
+  onClose,
+}: {
+  open: boolean;
+  title: string;
+  message?: string;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    if (!open) return;
+    const t = window.setTimeout(onClose, 3500);
+    return () => window.clearTimeout(t);
+  }, [open, onClose]);
+
+  return (
+    <div
+      className={[
+        "fixed bottom-4 right-4 z-[70] transition",
+        open
+          ? "pointer-events-auto opacity-100"
+          : "pointer-events-none opacity-0",
+      ].join(" ")}
+      aria-hidden={!open}
+    >
+      <div className="w-[min(380px,92vw)] rounded-2xl border border-black/10 bg-white shadow-xl">
+        <div className="flex items-start gap-3 p-4">
+          <div className="mt-1 h-2.5 w-2.5 rounded-full bg-emerald-500" />
+          <div className="min-w-0">
+            <div className="text-sm font-semibold text-black">{title}</div>
+            {message ? (
+              <div className="mt-0.5 text-sm text-black/65">{message}</div>
+            ) : null}
+          </div>
+          <button
+            onClick={onClose}
+            className="ml-auto rounded-xl border border-black/10 px-2.5 py-1.5 text-xs text-black/70 hover:bg-black/[0.03]"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* -------------------- DELETE MODAL -------------------- */
 function DeleteModal({
   open,
   reservation,
@@ -127,6 +214,7 @@ function DeleteModal({
   );
 }
 
+/* -------------------- PAGE -------------------- */
 export default function AdminReservations() {
   const [items, setItems] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -142,22 +230,67 @@ export default function AdminReservations() {
 
   const [copied, setCopied] = useState(false);
 
-  // NEW: delete modal state
+  // delete modal state
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Reservation | null>(null);
 
-  async function refresh() {
-    setLoading(true);
+  // NEW indicator + toast state
+  const [toastOpen, setToastOpen] = useState(false);
+  const [toastText, setToastText] = useState<string | undefined>(undefined);
+  const newlyArrivedIdsRef = useRef<Set<string>>(new Set());
+  const lastIdsRef = useRef<Set<string>>(new Set());
+  const initialLoadedRef = useRef(false);
+
+  async function refresh(opts?: { silent?: boolean }) {
+    if (!opts?.silent) setLoading(true);
+
     try {
-      const data = await listReservations();
+      const data = await apiListReservations();
+
+      // Detect newly arrived IDs (NEW pill + toast)
+      const nextIds = new Set(data.map((x) => x.id));
+      const prevIds = lastIdsRef.current;
+
+      if (initialLoadedRef.current) {
+        const newOnes = data.filter((x) => !prevIds.has(x.id));
+        if (newOnes.length > 0) {
+          for (const r of newOnes) newlyArrivedIdsRef.current.add(r.id);
+
+          const first = newOnes[0];
+          setToastText(
+            newOnes.length === 1
+              ? `${first.fullName} · ${formatDate(first.checkIn)} – ${formatDate(
+                  first.checkOut,
+                )}`
+              : `${newOnes.length} new reservations received`,
+          );
+          setToastOpen(true);
+        }
+      } else {
+        initialLoadedRef.current = true;
+      }
+
+      lastIdsRef.current = nextIds;
       setItems(data);
+    } catch (err) {
+      // keep minimal UI change: just show an action error if needed
+      const msg =
+        err instanceof Error ? err.message : "Failed to load reservations.";
+      setActionError(msg);
     } finally {
-      setLoading(false);
+      if (!opts?.silent) setLoading(false);
     }
   }
 
   useEffect(() => {
     refresh();
+    // Polling (temporary, simplest replacement for mockApi local events)
+    const t = window.setInterval(() => {
+      refresh({ silent: true });
+    }, 4000);
+
+    return () => window.clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const counts = useMemo(() => {
@@ -195,15 +328,23 @@ export default function AdminReservations() {
     });
   }, [items, active, query]);
 
+  const isNewArrival = (id: string) => newlyArrivedIdsRef.current.has(id);
+
   async function setStatus(id: string, status: ReservationStatus) {
     setActionError(null);
     setSaving(id);
+
     try {
-      const updated = await updateReservationStatus(id, status);
+      const updated = await apiUpdateReservationStatus(id, status);
       setItems((prev) => prev.map((x) => (x.id === id ? updated : x)));
       setSelected((prev) => (prev?.id === id ? updated : prev));
-    } catch {
-      setActionError("Failed to update status. Please try again.");
+
+      // remove NEW badge once staff touches it
+      newlyArrivedIdsRef.current.delete(id);
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : "Failed to update status.";
+      setActionError(msg);
     } finally {
       setSaving(null);
     }
@@ -228,7 +369,6 @@ Message: ${r.message ?? "—"}
     window.setTimeout(() => setCopied(false), 1500);
   }
 
-  // OPEN delete modal (no window.confirm)
   function requestDelete(r: Reservation) {
     setActionError(null);
     setDeleteTarget(r);
@@ -242,14 +382,17 @@ Message: ${r.message ?? "—"}
     setDeleting(deleteTarget.id);
 
     try {
-      await deleteReservation(deleteTarget.id);
+      await apiDeleteReservation(deleteTarget.id);
       setItems((prev) => prev.filter((x) => x.id !== deleteTarget.id));
       setSelected((prev) => (prev?.id === deleteTarget.id ? null : prev));
 
+      newlyArrivedIdsRef.current.delete(deleteTarget.id);
+
       setDeleteOpen(false);
       setDeleteTarget(null);
-    } catch {
-      setActionError("Failed to delete. Please try again.");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to delete.";
+      setActionError(msg);
     } finally {
       setDeleting(null);
     }
@@ -269,6 +412,14 @@ Message: ${r.message ?? "—"}
 
   return (
     <div className="space-y-6">
+      {/* Toast */}
+      <Toast
+        open={toastOpen}
+        title="New reservation received"
+        message={toastText}
+        onClose={() => setToastOpen(false)}
+      />
+
       <AdminPageHeader
         eyebrow="RESERVATIONS"
         title="Manage Requests"
@@ -281,7 +432,7 @@ Message: ${r.message ?? "—"}
               placeholder="Search name, email, ID, phone, room..."
             />
             <button
-              onClick={refresh}
+              onClick={() => refresh()}
               className="rounded-2xl border border-black/10 bg-white px-4 py-2.5 text-sm shadow-sm hover:bg-black/[0.03]"
             >
               Refresh
@@ -352,10 +503,22 @@ Message: ${r.message ?? "—"}
                       className="border-t border-black/10 hover:bg-black/[0.02]"
                     >
                       <td className="px-5 py-4 font-medium">{r.id}</td>
+
                       <td className="px-5 py-4">
-                        <div className="font-medium">{r.fullName}</div>
+                        <div className="flex items-center gap-2">
+                          <div className="font-medium">{r.fullName}</div>
+
+                          {/* NEW indicator */}
+                          {isNewArrival(r.id) && (
+                            <span className="rounded-full bg-[rgb(var(--gold))]/15 px-2 py-0.5 text-[11px] font-semibold text-[rgb(var(--gold))]">
+                              NEW
+                            </span>
+                          )}
+                        </div>
+
                         <div className="text-xs text-black/60">{r.email}</div>
                       </td>
+
                       <td className="px-5 py-4 text-black/70">
                         {formatDate(r.checkIn)} – {formatDate(r.checkOut)}
                       </td>
@@ -374,6 +537,10 @@ Message: ${r.message ?? "—"}
                           onClick={() => {
                             setActionError(null);
                             setCopied(false);
+
+                            // mark as seen when opened
+                            newlyArrivedIdsRef.current.delete(r.id);
+
                             setSelected(r);
                           }}
                           className="rounded-xl border border-black/10 bg-white px-3 py-1.5 text-xs shadow-sm hover:bg-black/[0.03]"
@@ -547,7 +714,6 @@ Message: ${r.message ?? "—"}
                     {copied ? "Copied ✓" : "Copy Details"}
                   </button>
 
-                  {/* Delete -> opens modal */}
                   <button
                     disabled={
                       saving === selected.id || deleting === selected.id
