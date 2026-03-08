@@ -341,3 +341,116 @@ body {
 .contact-invalid {
   border-color: rgba(239, 68, 68, 0.6) !important;
 }
+
+  .gallery{
+    @apply bg-white;
+    padding: 72px 0 88px;
+  }
+
+  .gallery-title{
+    text-align: center;
+    font-family: ui-serif, Georgia, "Times New Roman", Times, serif;
+    letter-spacing: 0.22em;
+    font-size: clamp(34px, 3.6vw, 56px);
+    line-height: 1.05;
+    color: rgba(0,0,0,0.92);
+    margin: 0;
+  }
+
+  .album{
+    margin: 36px auto 0;
+    width: min(980px, 100%);
+    border-radius: 18px;
+    background: rgba(0,0,0,0.025);
+    padding: 16px;
+    box-shadow: 0 14px 38px rgba(0,0,0,0.07);
+  }
+
+  .album-grid{
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      "a b"
+      "c d";
+    gap: 14px;
+  }
+
+  .album-a{ grid-area: a; }
+  .album-b{ grid-area: b; }
+  .album-c{ grid-area: c; }
+  .album-d{ grid-area: d; }
+
+  .album-cell{
+    border-radius: 14px;
+    overflow: hidden;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    display: block;
+    padding: 0;
+  }
+
+  .album-cell:focus-visible{
+    outline: 2px solid rgba(0,0,0,0.30);
+    outline-offset: 4px;
+    border-radius: 14px;
+  }
+
+  .album-img{
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    aspect-ratio: 16 / 9;
+    transition: transform 520ms ease;
+    will-change: transform;
+  }
+
+  .album-c .album-img{
+    aspect-ratio: 21 / 9;
+  }
+
+  .album-cell:hover .album-img{
+    transform: scale(1.035);
+  }
+
+  @media (max-width: 1024px){
+    .gallery{ padding: 64px 0 80px; }
+    .album{ width: min(860px, 100%); }
+  }
+
+  @media (max-width: 700px){
+    .gallery{ padding: 56px 0 72px; }
+    .album{ padding: 12px; border-radius: 16px; }
+
+    .album-grid{
+      grid-template-columns: 1fr;
+      grid-template-areas:
+        "a"
+        "b"
+        "c"
+        "d";
+      gap: 12px;
+    }
+
+    .album-img{ aspect-ratio: 16 / 10; }
+    .album-c .album-img{ aspect-ratio: 16 / 10; }
+  }
+
+  .lightbox{
+    position: fixed;
+    inset: 0;
+    z-index: 999;
+    background: rgba(0,0,0,0.78);
+    display: grid;
+    place-items: center;
+    padding: 16px;
+  }
+
+  .lightbox-img{
+    width: min(1080px, 92vw);
+    max-height: 86vh;
+    object-fit: contain;
+    border-radius: 14px;
+    box-shadow: 0 22px 70px rgba(0,0,0,0.45);
+  }

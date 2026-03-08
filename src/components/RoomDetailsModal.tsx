@@ -2,7 +2,6 @@
 import { useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Room } from "../data/rooms";
-import { emitRoomAction } from "../admin/lib/roomActions";
 
 export function RoomDetailsModal({
   open,
@@ -215,18 +214,18 @@ export function RoomDetailsModal({
 
                       <button
                         type="button"
-                        onClick={() => {
-                          emitRoomAction("reserve", {
-                            id: room.id,
-                            type: room.type,
-                            name: room.name,
-                            image: room.image,
-                            price: room.price,
-                            badge: room.badge,
-                            meta: room.meta,
-                          });
-                          onClose();
-                        }}
+                        // onClick={() => {
+                        //   emitRoomAction("reserve", {
+                        //     id: room.id,
+                        //     type: room.type,
+                        //     name: room.name,
+                        //     image: room.image,
+                        //     price: room.price,
+                        //     badge: room.badge,
+                        //     meta: room.meta,
+                        // //   });
+                        //   onClose();
+                        // }}
                         className="rounded-2xl bg-[rgb(var(--gold))] px-5 py-3 text-sm font-semibold text-[#0b1220] hover:opacity-90 transition"
                       >
                         Reserve this room

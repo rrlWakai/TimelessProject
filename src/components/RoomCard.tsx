@@ -1,5 +1,4 @@
 // src/components/RoomCard.tsx
-import { emitRoomAction } from "../admin/lib/roomActions";
 
 type Room = {
   id: string;
@@ -70,14 +69,14 @@ export function RoomCard({ room }: Props) {
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={() => emitRoomAction("details", room)}
+              // onClick={() => emitRoomAction("details", room)}
               className="rounded-full border border-black/10 px-4 py-2 text-sm hover:bg-black/5 transition"
             >
               Details
             </button>
             <button
               type="button"
-              onClick={() => emitRoomAction("reserve", room)}
+              // onClick={() => emitRoomAction("reserve", room)}
               className="rounded-full bg-[rgb(var(--gold))] px-4 py-2 text-sm text-[#0b1220] font-semibold hover:opacity-90 transition"
             >
               Reserve

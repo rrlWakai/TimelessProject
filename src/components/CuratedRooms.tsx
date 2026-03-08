@@ -2,8 +2,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Section } from "./Section";
 import { RoomCard } from "./RoomCard";
-import { ROOMS, type Room } from "../data/rooms";
-import { onRoomAction } from "../admin/lib/roomActions";
+import { ROOMS } from "../data/rooms";
+
 import { RoomDetailsModal } from "./RoomDetailsModal";
 
 function clamp(n: number, min: number, max: number) {
@@ -67,20 +67,7 @@ export function CuratedRooms() {
 
   // ✅ Details modal state
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [activeRoom, setActiveRoom] = useState<Room | null>(null);
-
-  // ✅ Listen for RoomCard "details" action
-  useEffect(() => {
-    return onRoomAction((detail) => {
-      if (detail.type !== "details") return;
-
-      const found = ROOMS.find((r) => r.id === detail.room.id) ?? null;
-      if (!found) return;
-
-      setActiveRoom(found);
-      setDetailsOpen(true);
-    });
-  }, []);
+  const [activeRoom] = useState<(typeof ROOMS)[0] | null>(null);
 
   const updateControls = () => {
     const el = trackRef.current;

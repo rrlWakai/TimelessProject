@@ -4,6 +4,7 @@ import { Container } from "./Container";
 const NAV_LINKS = [
   { label: "Home", href: "#top" },
   { label: "Rooms", href: "#rooms" },
+  { label: "Gallery", href: "#gallery" },
   { label: "Amenities", href: "#amenities" },
   { label: "Reviews", href: "#reviews" },
   { label: "Contact", href: "#contact" },
